@@ -453,8 +453,9 @@ class GenerateBEVSegmentationForArgo(object):
                  bev_size=(100, 200),  # H, W
                  thickness=2, 
               ):
+        # 存储 bev_size 参数，表示鸟瞰图的尺寸（高度和宽度）。
         self.bev_size = bev_size
-        # 注意这里 除的顺序
+        # 计算比例，将 map_size 转换为 bev_size 的比例，注意这里的计算顺序。
         self.scale = ((map_size[0][1] - map_size[0][0]) / bev_size[1], (map_size[1][1] - map_size[1][0]) / bev_size[0]) 
         self.map_size = map_size
         self.patch_size = box(map_size[0][0], map_size[1][0], map_size[0][1], map_size[1][1])   # (x_min, y_min, x_max, y_max)
@@ -472,6 +473,7 @@ class GenerateBEVSegmentationForArgo(object):
             dict: The dict containing loaded SDMap Pts and Patch.
         """
         gt_instances = results['ann_info']['gt_instance_xyz_list']
+        # 创建一个形状为 bev_size 的全零数组，用于存储鸟瞰图补丁，元素类型为 np.uint8。
         bev_map_patch = np.zeros(self.bev_size, dtype=np.uint8)
         bev_map_lines = []
         
@@ -482,28 +484,36 @@ class GenerateBEVSegmentationForArgo(object):
                 for new_pts_single in new_pts.geoms:
                     if new_pts_single.length == 0.0:
                         continue
+                    # 将坐标转换为相应的比例并添加偏移，然后转换为整数。
                     line = (np.asarray(list(new_pts_single.coords)) + np.array([self.map_size[0][1], self.map_size[1][1]])) / self.scale
                     line = line.astype(np.int)
-
+                    # 使用 cv2.polylines 在 bev_map_patch 上绘制线条。
                     cv2.polylines(bev_map_patch, line[None], False, (255, 255, 255), thickness=self.thickness)
 
             elif new_pts.length != 0.0:
+                # 将坐标转换为相应的比例并添加偏移，然后转换为整数。
                 line = (np.asarray(list(new_pts.coords)) + np.array([self.map_size[0][1], self.map_size[1][1]])) / self.scale
                 line = line.astype(np.int)
               
+                # 使用 cv2.polylines 在 bev_map_patch 上绘制线条。
                 cv2.polylines(bev_map_patch, line[None], False, (255, 255, 255), thickness=self.thickness)
         
+        # 将 bev_map_patch 沿 y 轴翻转。
         bev_map_patch = cv2.flip(bev_map_patch, 0)
 
-        # # 可视化
+        # 用于将生成的 bev_map_patch 进行可视化。
         # vis_dir = '../vis_sdmap/'
         # mmcv.mkdir_or_exist(vis_dir)
         # import os
         # cv2.imwrite(os.path.join(vis_dir, f"{results['sample_idx']}.png"), bev_map_patch)
       
+        # 将 bev_map_patch 转换为浮点数类型。
         bev_map_patch = bev_map_patch.astype(np.float)
+        # 将 bev_map_patch 元素归一化，除以其最大值。
         bev_map_patch /= bev_map_patch.max()
+        # 将处理好的 bev_map_patch 转换为张量并存储在 results 字典的 'gt_bevsegmentations' 键下。
         results['gt_bevsegmentations'] = DC(to_tensor([bev_map_patch]), stack=True) 
+        # 返回更新后的 results 字典。
         return results
 
 

@@ -43,33 +43,37 @@ _dim_ = 256
 _pos_dim_ = _dim_//2
 _ffn_dim_ = _dim_*2
 _num_levels_ = 1
-# bev_h_ = 50
-# bev_w_ = 50
-bev_h_ = 200
-bev_w_ = 100
+bev_h_ = 50
+bev_w_ = 50
+# bev_h_ = 200
+# bev_w_ = 100
 queue_length = 1 # each sequence contains `queue_length` frames.
 
 
 bev_seg_head=dict(
         type='DeepLabV3CustomHead',
-        in_channels=_dim_,
-        in_index=0,
+        in_channels=_dim_,          # 输入通道数
+        in_index=0,                 # 输入的索引，从前面层的输出中选择的特定索引，这里为 0
         channels=_dim_ // 2,
-        dilations=(1, 12, 24, 36),
+        dilations=(1, 12, 24, 36),  # 扩张率，用于空洞卷积，这里设置了多个扩张率，分别为 1, 12, 24, 36
         c1_in_channels=_dim_,
         c1_channels=_dim_ // 2,
-        dropout_ratio=0.1,
-        num_classes=2,      # 两种类别，前景或者背景
-        norm_cfg=dict(type='SyncBN', requires_grad=True),
-        align_corners=False,
+        dropout_ratio=0.1,          # 丢弃率，用于防止过拟合，设置为 0.1
+        num_classes=2,              # 类别数量，这里设置为 2，表示前景和背景两类
+        # 归一化配置，使用批归一化（BN）并设置 requires_grad 为 True，即更新归一化层的参数
+        # norm_cfg=dict(type='BN', requires_grad=True),   # SyncBN
+        align_corners=False,        # 是否对齐角点，设置为 False
         loss_decode=dict(       # 占位, 其实并没有用
             # type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)
             type='DiceLoss', loss_name='loss_dice', loss_weight=1.0),
         
-        downsample_label_ratio=0.5,
+        downsample_label_ratio=0.5, # 下采样标签的比例，设置为 0.5
         loss_name='bev',
+        # 自定义的解码损失列表
         loss_decode_custom=[
+        # 第一个自定义损失，是使用 sigmoid 的交叉熵损失，损失名称为 seg_loss_ce，损失权重为 0.5
         dict(loss_name='seg_loss_ce', loss=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=0.5)),
+        # 第二个自定义损失，是 DiceLoss，损失权重为 15.0，损失名称为 seg_loss_dice
         dict(loss_name='seg_loss_dice', loss=dict(type='DiceLoss', loss_weight=15.0)),
             ]
     )
@@ -98,29 +102,29 @@ model = dict(
         num_outs=_num_levels_,
         relu_before_extra_convs=True),
 
-    bev_seg_head=dict(
-        type='DeepLabV3CustomHead',
-        in_channels=_dim_,
-        in_index=0,
-        channels=_dim_ // 2,
-        dilations=(1, 12, 24, 36),
-        c1_in_channels=_dim_,
-        c1_channels=_dim_ // 2,
-        dropout_ratio=0.1,
-        num_classes=2,      # 两种类别，前景或者背景
-        norm_cfg=dict(type='SyncBN', requires_grad=True),
-        align_corners=False,
-        loss_decode=dict(       # 占位, 其实并没有用
-            # type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)
-            type='DiceLoss', loss_name='loss_dice', loss_weight=1.0),
+    # bev_seg_head=dict(
+    #     type='DeepLabV3CustomHead',
+    #     in_channels=_dim_,
+    #     in_index=0,
+    #     channels=_dim_ // 2,
+    #     dilations=(1, 12, 24, 36),
+    #     c1_in_channels=_dim_,
+    #     c1_channels=_dim_ // 2,
+    #     dropout_ratio=0.1,
+    #     num_classes=2,      # 两种类别，前景或者背景
+    #     norm_cfg=dict(type='SyncBN', requires_grad=True),
+    #     align_corners=False,
+    #     loss_decode=dict(       # 占位, 其实并没有用
+    #         # type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)
+    #         type='DiceLoss', loss_name='loss_dice', loss_weight=1.0),
         
-        downsample_label_ratio=0.5,
-        loss_name='bev',
-        loss_decode_custom=[
-        dict(loss_name='seg_loss_ce', loss=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=0.5)),
-        dict(loss_name='seg_loss_dice', loss=dict(type='DiceLoss', loss_weight=15.0)),
-            ]
-            ),
+    #     downsample_label_ratio=0.5,
+    #     loss_name='bev',
+    #     loss_decode_custom=[
+    #     dict(loss_name='seg_loss_ce', loss=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=0.5)),
+    #     dict(loss_name='seg_loss_dice', loss=dict(type='DiceLoss', loss_weight=15.0)),
+    #         ]
+    #         ),
 
     pts_bbox_head=dict(
         type='MapTRHead',
@@ -148,6 +152,7 @@ model = dict(
             use_can_bus=True,
             embed_dims=_dim_,
             bev_seg_head=bev_seg_head,      #  bev-seg-head
+            with_se=True,
             num_cams=6,
             encoder=dict(
                 type='BEVFormerEncoder',
@@ -245,7 +250,8 @@ model = dict(
             pc_range=point_cloud_range))))
 
 dataset_type = 'CustomNuScenesLocalMapDataset'
-data_root = 'data/nuscenes/'
+# data_root = 'data/nuscenes/'
+data_root = '/home/jianglu/Documents/MapTR/data/nuscenes/'
 file_client_args = dict(backend='disk')
 
 
@@ -283,12 +289,13 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=16,
+    samples_per_gpu=1,
+    workers_per_gpu=0,
     train=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='./data/nuscenes_infos_temporal_train.pkl',
+        # ann_file='./data/nuscenes_infos_temporal_train.pkl',
+        ann_file=data_root + 'nuscenes_infos_temporal_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         modality=input_modality,
@@ -312,7 +319,8 @@ data = dict(
         ),
     val=dict(type=dataset_type,
              data_root=data_root,
-             ann_file='./data/nuscenes_infos_temporal_val.pkl',
+            #  ann_file='./data/nuscenes_infos_temporal_val.pkl',
+             ann_file=data_root + 'nuscenes_infos_temporal_val.pkl',
              map_ann_file=data_root + 'nuscenes_map_anns_val.json',
              pipeline=test_pipeline,  bev_size=(bev_h_, bev_w_),
              pc_range=point_cloud_range,
@@ -323,7 +331,8 @@ data = dict(
              classes=class_names, modality=input_modality, samples_per_gpu=1),
     test=dict(type=dataset_type,
               data_root=data_root,
-              ann_file='./data/nuscenes_infos_temporal_test.pkl',
+            #   ann_file='./data/nuscenes_infos_temporal_test.pkl',
+              ann_file=data_root + 'nuscenes_infos_temporal_val.pkl',
               map_ann_file=data_root + 'nuscenes_map_anns_val.json',
               pipeline=test_pipeline, bev_size=(bev_h_, bev_w_),
               pc_range=point_cloud_range,

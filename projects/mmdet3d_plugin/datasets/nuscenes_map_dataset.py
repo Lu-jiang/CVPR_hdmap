@@ -25,7 +25,7 @@ from shapely import affinity, ops
 from shapely.geometry import LineString, box, MultiPolygon, MultiLineString
 from mmdet.datasets.pipelines import to_tensor
 import json
-
+from nuscenes import NuScenes
 
 def add_rotation_noise(extrinsics, std=0.01, mean=0.0):
     #n = extrinsics.shape[0]
@@ -984,6 +984,7 @@ class CustomNuScenesLocalMapDataset(CustomNuScenesDataset):
         self.eval_use_same_gt_sample_num_flag = eval_use_same_gt_sample_num_flag
 
         # vectorized the location map for nuscense
+        self.nusc = NuScenes(version='v1.0-mini', dataroot=self.data_root, verbose=False)
         self.vector_map = VectorizedLocalMap(kwargs['data_root'], 
                             patch_size=self.patch_size, map_classes=self.MAPCLASSES, 
                             fixed_ptsnum_per_line=fixed_ptsnum_per_line,
@@ -1172,6 +1173,8 @@ class CustomNuScenesLocalMapDataset(CustomNuScenesDataset):
                 - ann_info (dict): Annotation info.
         """
         info = self.data_infos[index]
+        # add scene loc
+        info['location'] = self.nusc.get('log', self.nusc.get('scene', info['scene_token'])['log_token'])['location']
         # standard protocal modified from SECOND.Pytorch
         # print("info keys: ", info.keys())
         input_dict = dict(
@@ -1188,7 +1191,7 @@ class CustomNuScenesLocalMapDataset(CustomNuScenesDataset):
             can_bus=info['can_bus'],
             frame_idx=info['frame_idx'],
             timestamp=info['timestamp'] / 1e6,
-            map_location = info['map_location'],
+            map_location = info['location'],
         )
         # import pdb;pdb.set_trace()
         # lidar to ego transform

@@ -363,11 +363,17 @@ class MapTRPerceptionTransformer(BaseModule):
             # bev_feature = self.process_net(bev_feature)
             # bev_embed = bev_feature.flatten(2).permute(0, 2, 1)
 
+            # 计算 bev_seg 的 softmax，将结果存储在 bev_seg_prob 中，沿维度 1 进行 softmax 操作
             bev_seg_prob = torch.softmax(bev_seg, dim=1)
+            # 使用 change_channels 方法将 bev_seg_prob 转换为新的表示，进行通道数的变换和特征处理
             bev_seg_new = self.change_channels(bev_seg_prob)
+            # 调用 gen_grid_2d 方法生成 2D 网格，将生成的网格减去 0.5 并取绝对值,给 BEV 特征添加位置信息，有助于模型更好地理解不同位置的特征 
             grid_2d = torch.abs( (self.gen_grid_2d(H=bev_h, W=bev_w, bs=B, device=device, dtype=dtype) - 0.5))
+            # 将 bev_feature、bev_seg_new 和 grid_2d 沿维度 1 拼接在一起，将分割信息和位置信息添加到 BEV 特征中
             bev_feature = torch.cat((bev_feature, bev_seg_new, grid_2d), dim=1)
+            # 对拼接后的特征进行进一步处理，将其转换为更适合后续检测任务的特征表示，为了提取更高级的特征和调整特征维度 
             bev_feature = self.process_net(bev_feature)
+            # 将处理后的特征 bev_feature 进行展平操作，将维度 2 及以后的维度展平，然后将结果进行维度重排，将最后的维度移到中间位置
             bev_embed = bev_feature.flatten(2).permute(0, 2, 1)
 
 
